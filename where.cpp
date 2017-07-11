@@ -2,6 +2,8 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <stdexcept>
+#include <memory>
 
 typedef std::map<std::string, int> header_t;
 typedef std::vector<std::string> row_t;
@@ -23,6 +25,11 @@ public:
     // then the function parameter could be (table, row_index).
     virtual bool eval(header_t &header, row_t &row) = 0;
     virtual void print() = 0;
+
+    virtual ~ConditionBase()
+    {
+        // nothing here, but required by polymorphism.
+    }
 };
 
 // Subclass for any type of conditions.
@@ -56,7 +63,21 @@ public:
 template <>
 bool Condition<int>::eval(header_t &header, row_t &row)
 {
-    int val = std::stoi(row[header[column]]);
+    int val;
+
+    try
+    {
+        val = std::stoi(row[header[column]]);
+    }
+    catch (const std::invalid_argument& e)
+    {
+        return false;
+    }
+    catch (const std::out_of_range& e)
+    {
+        return false;
+    }
+
     switch(op)
     {
         case EQ: return val == value;
@@ -73,7 +94,21 @@ bool Condition<int>::eval(header_t &header, row_t &row)
 template <>
 bool Condition<float>::eval(header_t &header, row_t &row)
 {
-    float val = (float)std::stod(row[header[column]]);
+    float val;
+
+    try
+    {
+        val = (float)std::stod(row[header[column]]);
+    }
+    catch (const std::invalid_argument& e)
+    {
+        return false;
+    }
+    catch (const std::out_of_range& e)
+    {
+        return false;
+    }
+
     switch(op)
     {
         case EQ: return val == value;
@@ -114,6 +149,14 @@ public:
     static const operator_t AND = 0;
     static const operator_t OR  = 1;
 
+    ~Where ()
+    {
+        for (size_t i = 0; i < conditions.size(); i++)
+        {
+            delete conditions[i];
+        }
+    }
+
     Where *AddCondition(ConditionBase *c)
     {
         conditions.push_back(c);
@@ -126,34 +169,43 @@ public:
         return this;
     }
 
-    // - A table class should be defined to encapsulate table header and table rows,
+    // A table class should be defined to encapsulate table header and table rows,
     // then the function parameter could be (table, row_index, op_index).
-    // - The op_index is the start operator for evaluation, the function is written
-    // recursively to simplify the code.
-    bool eval(header_t &header, row_t &row, int op_index = 0)
+    bool eval(header_t &header, row_t &row)
     {
-        bool result = conditions[op_index]->eval(header, row);
+        bool result = conditions[0]->eval(header, row);
 
-        // debug
-        // conditions[op_index]->print();
-        // std::cout << " -> " << (result ? "true" : "false") << std::endl;
-
+        size_t op_index = 0;
         while(op_index < operators.size())
         {
             if (operators[op_index] == AND)
             {
                 op_index++;
-                result = result && conditions[op_index]->eval(header, row);
 
-                // debug
-                // conditions[op_index]->print();
-                // std::cout << " -> " << (conditions[op_index]->eval(header, row) ? "true" : "false") << std::endl;
+                // If one operand of AND is false, skip :)
+                if (result)
+                {
+                    result = conditions[op_index]->eval(header, row);
+                }
+                else
+                {
+                    continue;
+                }
             }
             else // OR
             {
                 op_index++;
-                result = result || eval(header, row, op_index);
-                break; // break here, thus this function can be written as non-recursive.
+
+                // If one operand of OR is true, stop here :)
+                if (result)
+                {
+                    return true;
+                }
+                else
+                {
+                    result = conditions[op_index]->eval(header, row);
+                    continue;
+                }
             }
         }
 
@@ -173,7 +225,7 @@ int main()
     };
 
     // WHERE name != "Bill Gates" AND age > 60 OR gender = "female" AND score <= 100 OR company = "IBX"
-    Where *w = new Where();
+    std::shared_ptr<Where> w(new Where());
     w->AddCondition(new Condition<std::string>("name", ConditionBase::NE, "Bill Gates"))
      ->AddOperator(Where::AND)
      ->AddCondition(new Condition<int>("age", ConditionBase::GT, 60))
@@ -186,11 +238,11 @@ int main()
 
     std::cout << "name\t\tage\tgender\tscore\tcompany\n"
               << "---------+---------+---------+---------+---------+\n";
-    for (int i = 0; i < table.size(); i++)
+    for (size_t i = 0; i < table.size(); i++)
     {
         if (w->eval(header, table[i]))
         {
-            for (int j = 0; j < table[i].size(); j++)
+            for (size_t j = 0; j < table[i].size(); j++)
             {
                 std::cout << table[i][j] << '\t';
             }
