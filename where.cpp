@@ -6,9 +6,9 @@
 #include <vector>    // vector
 
 typedef std::map<std::string, int> header_t;
-typedef std::vector<std::string>   row_t;
-typedef std::vector<row_t>         table_t;
-typedef int                        operator_t;
+typedef std::vector<std::string>      row_t;
+typedef std::vector<row_t>          table_t;
+typedef int                      operator_t;
 
 class Operator
 {
@@ -215,8 +215,10 @@ public:
 
 int main()
 {
-    header_t header = {{"name", 0}, {"age", 1}, {"gender", 2}, {"score", 3}, {"company", 4}};
-    table_t table = {
+    header_t header {
+        {"name", 0}, {"age", 1}, {"gender", 2}, {"score", 3}, {"company", 4}
+    };
+    table_t table {
         {"John Doe",   "20", "male",   "110.5", "IBX"      },
         {"Jenny Ho",   "21", "female", "100",   "Huawei"   },
         {"Bill Gates", "61", "male",   "101",   "Microsoft"},
@@ -242,9 +244,10 @@ int main()
     {
         if (w->eval(header, table[i]))
         {
-            for (size_t j = 0; j < table[i].size(); j++)
+            std::cout << table[i][0];
+            for (size_t j = 1; j < table[i].size(); j++)
             {
-                std::cout << table[i][j] << '\t';
+                std::cout << '\t' << table[i][j];
             }
             std::cout << std::endl;
         }
