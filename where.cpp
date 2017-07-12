@@ -24,7 +24,7 @@ public:
 
     static const std::string toString(operator_t op)
     {
-        static std::string ops[8] = {"=", "!=", "<", "<=", ">", ">=", "AND", "OR"};
+        static const std::string ops[8] = {"=", "!=", "<", "<=", ">", ">=", "AND", "OR"};
 
         return ops[op];
     }
@@ -224,7 +224,7 @@ int main()
         {"Jane Doe",   "32", "female", "199",   "Microsoft"}
     };
 
-    // WHERE name != "Bill Gates" AND age > 60 OR gender = "female" AND score <= 100 OR company = "IBX"
+    // WHERE name != "Bill Gates" AND age > 30 OR gender = "female" AND score <= 100 OR company = "IBX"
     std::shared_ptr<Where> w(new Where());
     w->AddCondition(new Condition<std::string>("name", Operator::NE, "Bill Gates"))
      ->AddOperator(Operator::AND)
