@@ -1,9 +1,9 @@
-#include <iostream>
-#include <string>
-#include <vector>
-#include <map>
-#include <stdexcept>
-#include <memory>
+#include <iostream>  // cout
+#include <map>       // map
+#include <memory>    // shared_ptr
+#include <stdexcept> // stoi, stod
+#include <string>    // string, stoi, stod
+#include <vector>    // vector
 
 typedef std::map<std::string, int> header_t;
 typedef std::vector<std::string> row_t;
@@ -23,7 +23,7 @@ public:
 
     // A table class should be defined to encapsulate table header and table rows,
     // then the function parameter could be (table, row_index).
-    virtual bool eval(header_t &header, row_t &row) = 0;
+    virtual bool eval(header_t& header, row_t& row) = 0;
     virtual void print() = 0;
 
     virtual ~ConditionBase()
@@ -41,16 +41,37 @@ private:
     operator_t op;
     T value;
 
+    bool getColumnValue(header_t& header, row_t& row, T& val)
+    {
+        val = row[header[column]];
+        return true;
+    }
+
 public:
     // construct a new condition. i.e. name = "John Doe"
-    Condition(std::string column, operator_t op, T value)
+    Condition(const std::string& column, operator_t op, const T& value)
     {
         this->column = column;
         this->op = op;
         this->value = value;
     }
 
-    bool eval(header_t &header, row_t &row);
+    bool eval(header_t& header, row_t& row)
+    {
+        T val;
+        if (!getColumnValue(header, row, val)) return false;
+
+        switch(op)
+        {
+            case EQ: return val == value;
+            case NE: return val != value;
+            case LT: return val <  value;
+            case LE: return val <= value;
+            case GT: return val >  value;
+            case GE: return val >= value;
+            default: return false;
+        }
+    }
 
     void print()
     {
@@ -61,10 +82,8 @@ public:
 
 // Handle integer
 template <>
-bool Condition<int>::eval(header_t &header, row_t &row)
+bool Condition<int>::getColumnValue(header_t& header, row_t& row, int &val)
 {
-    int val;
-
     try
     {
         val = std::stoi(row[header[column]]);
@@ -78,24 +97,13 @@ bool Condition<int>::eval(header_t &header, row_t &row)
         return false;
     }
 
-    switch(op)
-    {
-        case EQ: return val == value;
-        case NE: return val != value;
-        case LT: return val <  value;
-        case LE: return val <= value;
-        case GT: return val >  value;
-        case GE: return val >= value;
-        default: return false;
-    }
+    return true;
 }
 
 // Handle floating point number
 template <>
-bool Condition<float>::eval(header_t &header, row_t &row)
+bool Condition<float>::getColumnValue(header_t& header, row_t& row, float &val)
 {
-    float val;
-
     try
     {
         val = (float)std::stod(row[header[column]]);
@@ -109,40 +117,14 @@ bool Condition<float>::eval(header_t &header, row_t &row)
         return false;
     }
 
-    switch(op)
-    {
-        case EQ: return val == value;
-        case NE: return val != value;
-        case LT: return val <  value;
-        case LE: return val <= value;
-        case GT: return val >  value;
-        case GE: return val >= value;
-        default: return false;
-    }
-}
-
-// Handle string
-template <>
-bool Condition<std::string>::eval(header_t &header, row_t &row)
-{
-    std::string val = row[header[column]];
-    switch(op)
-    {
-        case EQ: return val == value;
-        case NE: return val != value;
-        case LT: return val <  value;
-        case LE: return val <= value;
-        case GT: return val >  value;
-        case GE: return val >= value;
-        default: return false;
-    }
+    return true;
 }
 
 // Where Clause
 class Where
 {
 private:
-    std::vector<ConditionBase *> conditions; // all conditions in the clause
+    std::vector<ConditionBase*> conditions; // all conditions in the clause
     std::vector<operator_t> operators;       // all operators in the clause
 
 public:
@@ -157,13 +139,13 @@ public:
         }
     }
 
-    Where *AddCondition(ConditionBase *c)
+    Where* AddCondition(ConditionBase* c)
     {
         conditions.push_back(c);
         return this;
     }
 
-    Where *AddOperator(operator_t op)
+    Where* AddOperator(operator_t op)
     {
         operators.push_back(op);
         return this;
@@ -171,7 +153,7 @@ public:
 
     // A table class should be defined to encapsulate table header and table rows,
     // then the function parameter could be (table, row_index, op_index).
-    bool eval(header_t &header, row_t &row)
+    bool eval(header_t& header, row_t& row)
     {
         bool result = conditions[0]->eval(header, row);
 
