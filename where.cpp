@@ -6,25 +6,37 @@
 #include <vector>    // vector
 
 typedef std::map<std::string, int> header_t;
-typedef std::vector<std::string> row_t;
-typedef std::vector<row_t> table_t;
-typedef int operator_t;
+typedef std::vector<std::string>   row_t;
+typedef std::vector<row_t>         table_t;
+typedef int                        operator_t;
+
+class Operator
+{
+public:
+    static const operator_t EQ  = 0x00;
+    static const operator_t NE  = 0x01;
+    static const operator_t LT  = 0x02;
+    static const operator_t LE  = 0x03;
+    static const operator_t GT  = 0x04;
+    static const operator_t GE  = 0x05;
+    static const operator_t AND = 0x07;
+    static const operator_t OR  = 0x08;
+
+    static const std::string toString(operator_t op)
+    {
+        static std::string ops[8] = {"=", "!=", "<", "<=", ">", ">=", "AND", "OR"};
+
+        return ops[op];
+    }
+};
 
 // Base Condition class, to make sure all types of conditions can be invoked using the same base type.
 class ConditionBase
 {
 public:
-    static const operator_t EQ = 0;
-    static const operator_t NE = 1;
-    static const operator_t LT = 2;
-    static const operator_t LE = 3;
-    static const operator_t GT = 4;
-    static const operator_t GE = 5;
-
     // A table class should be defined to encapsulate table header and table rows,
     // then the function parameter could be (table, row_index).
     virtual bool eval(header_t& header, row_t& row) = 0;
-    virtual void print() = 0;
 
     virtual ~ConditionBase()
     {
@@ -52,31 +64,39 @@ public:
     Condition(const std::string& column, operator_t op, const T& value)
     {
         this->column = column;
-        this->op = op;
-        this->value = value;
+        this->op     = op;
+        this->value  = value;
     }
 
     bool eval(header_t& header, row_t& row)
     {
+        bool result;
         T val;
-        if (!getColumnValue(header, row, val)) return false;
-
-        switch(op)
+        if (getColumnValue(header, row, val))
         {
-            case EQ: return val == value;
-            case NE: return val != value;
-            case LT: return val <  value;
-            case LE: return val <= value;
-            case GT: return val >  value;
-            case GE: return val >= value;
-            default: return false;
+            switch(op)
+            {
+                case Operator::EQ: result = (val == value); break;
+                case Operator::NE: result = (val != value); break;
+                case Operator::LT: result = (val <  value); break;
+                case Operator::LE: result = (val <= value); break;
+                case Operator::GT: result = (val >  value); break;
+                case Operator::GE: result = (val >= value); break;
+                default:           result = false;          break;
+            }
         }
-    }
+        else // conversion error
+        {
+            result = false;
+        }
 
-    void print()
-    {
-        std::string ops[6] = {"=", "!=", "<", "<=", ">", ">="};
-        std::cout << column << ' ' << ops[op] << ' ' << value << std::endl;
+        // Debug
+        // std::cout << "#Debug: "
+        //           << column << ' ' << Operator::toString(op) << ' ' << value
+        //           << " -> " << column << " = " << val << " -> "
+        //           << (result ? "true" : "false") << std::endl;
+
+        return result;
     }
 };
 
@@ -88,11 +108,11 @@ bool Condition<int>::getColumnValue(header_t& header, row_t& row, int &val)
     {
         val = std::stoi(row[header[column]]);
     }
-    catch (const std::invalid_argument& e)
+    catch(const std::invalid_argument& e)
     {
         return false;
     }
-    catch (const std::out_of_range& e)
+    catch(const std::out_of_range& e)
     {
         return false;
     }
@@ -108,11 +128,11 @@ bool Condition<float>::getColumnValue(header_t& header, row_t& row, float &val)
     {
         val = (float)std::stod(row[header[column]]);
     }
-    catch (const std::invalid_argument& e)
+    catch(const std::invalid_argument& e)
     {
         return false;
     }
-    catch (const std::out_of_range& e)
+    catch(const std::out_of_range& e)
     {
         return false;
     }
@@ -124,14 +144,12 @@ bool Condition<float>::getColumnValue(header_t& header, row_t& row, float &val)
 class Where
 {
 private:
-    std::vector<ConditionBase*> conditions; // all conditions in the clause
-    std::vector<operator_t> operators;       // all operators in the clause
+    std::vector<ConditionBase*> conditions;  // all conditions in the clause
+    std::vector<operator_t>     operators;   // all operators in the clause
 
 public:
-    static const operator_t AND = 0;
-    static const operator_t OR  = 1;
 
-    ~Where ()
+    ~Where()
     {
         for (size_t i = 0; i < conditions.size(); i++)
         {
@@ -160,7 +178,7 @@ public:
         size_t op_index = 0;
         while(op_index < operators.size())
         {
-            if (operators[op_index] == AND)
+            if (operators[op_index] == Operator::AND)
             {
                 op_index++;
 
@@ -208,15 +226,15 @@ int main()
 
     // WHERE name != "Bill Gates" AND age > 60 OR gender = "female" AND score <= 100 OR company = "IBX"
     std::shared_ptr<Where> w(new Where());
-    w->AddCondition(new Condition<std::string>("name", ConditionBase::NE, "Bill Gates"))
-     ->AddOperator(Where::AND)
-     ->AddCondition(new Condition<int>("age", ConditionBase::GT, 60))
-     ->AddOperator(Where::OR)
-     ->AddCondition(new Condition<std::string>("gender", ConditionBase::EQ, "female"))
-     ->AddOperator(Where::AND)
-     ->AddCondition(new Condition<float>("score", ConditionBase::LE, 100))
-     ->AddOperator(Where::OR)
-     ->AddCondition(new Condition<std::string>("company", ConditionBase::EQ, "IBX"));
+    w->AddCondition(new Condition<std::string>("name", Operator::NE, "Bill Gates"))
+     ->AddOperator(Operator::AND)
+     ->AddCondition(new Condition<int>("age", Operator::GT, 30))
+     ->AddOperator(Operator::OR)
+     ->AddCondition(new Condition<std::string>("gender", Operator::EQ, "female"))
+     ->AddOperator(Operator::AND)
+     ->AddCondition(new Condition<float>("score", Operator::LE, 100))
+     ->AddOperator(Operator::OR)
+     ->AddCondition(new Condition<std::string>("company", Operator::EQ, "IBX"));
 
     std::cout << "name\t\tage\tgender\tscore\tcompany\n"
               << "---------+---------+---------+---------+---------+\n";
